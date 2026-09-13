@@ -99,15 +99,9 @@ TwapiId volatile gIdGenerator;
 TwapiWinPath gExePath;
 DWORD gExePathLen;
 
-/*
- * Whether the callback dll/libray has been initialized.
- * The value must be managed using the InterlockedCompareExchange functions to
- * ensure thread safety. The value returned by InterlockedCompareExhange
- * 0 -> first to call, do init,  1 -> init in progress by some other thread
- * 2 -> Init done
- */
-static TwapiOneTimeInitState gTwapiInitialized;
-
+static INIT_ONCE gTwapiInitialized;
+static BOOL
+BaseModuleInitOnce(PINIT_ONCE initOnceP, PVOID arg, PVOID *contextP);
 static void TwapiBaseModuleCleanup(TwapiInterpContext *ticP);
 static void Twapi_Cleanup(ClientData clientdata);
 static void Twapi_InterpCleanup(ClientData clientdata, Tcl_Interp *interp);
@@ -115,7 +109,6 @@ static void Twapi_InterpContextCleanup(void*, Tcl_Interp *interp);
 static TwapiInterpContext *TwapiInterpContextNew(Tcl_Interp *, HMODULE, TwapiModuleDef * );
 static void TwapiInterpContextDelete(TwapiInterpContext *ticP);
 static TwapiInterpContext *Twapi_AllocateInterpContext(Tcl_Interp *interp, HMODULE hmodule, TwapiModuleDef *);
-static int TwapiOneTimeInit(void *);
 
 HMODULE gTwapiModuleHandle;     /* DLL handle to ourselves */
 static TwapiModuleDef gBaseModule = {
@@ -265,12 +258,9 @@ int Twapi_base_Init(Tcl_Interp *interp)
     }
 #endif
 
-    /* Init unless already done. */
-    if (! TwapiDoOneTimeInit(&gTwapiInitialized, TwapiOneTimeInit, interp))
+    if (!InitOnceExecuteOnce(
+            &gTwapiInitialized, BaseModuleInitOnce, interp, NULL))
         return TCL_ERROR;
-
-    /* NOTE: no point setting Tcl_SetResult for errors as they are not
-       looked at when DLL is being loaded */
 
     /*
      * Per interp initialization
@@ -758,17 +748,19 @@ TwapiInterpContext *TwapiGetBaseContext(Tcl_Interp *interp)
 
 
 /* One time (per process) initialization for base module */
-static int TwapiOneTimeInit(void *pv)
+static BOOL
+BaseModuleInitOnce(PINIT_ONCE initOnceP, PVOID arg, PVOID *contextP)
 {
-    Tcl_Interp *interp = (Tcl_Interp *) pv;
+    Tcl_Interp *interp = (Tcl_Interp *) arg;
     WSADATA ws_data;
     WORD    ws_ver = MAKEWORD(1,1);
+
+    (void)contextP;
 
     gTlsIndex = TlsAlloc();
     if (gTlsIndex == TLS_OUT_OF_INDEXES) {
         Tcl_SetResult(interp, "TLS index allocation failed.", TCL_STATIC);
-        return TCL_ERROR;       /* No point storing error message.
-                                   Discarded anyways by Tcl */
+        return FALSE;
     }
 
     InitializeCriticalSection(&gTwapiInterpContextsCS);
@@ -790,7 +782,7 @@ static int TwapiOneTimeInit(void *pv)
     if (gTclVersion.major != TCL_MAJOR_VERSION ||
         gTclVersion.minor < TCL_MINOR_VERSION) {
         Tcl_SetResult(interp, "Unsupported Tcl version.", TCL_STATIC);
-        return TCL_ERROR;
+        return FALSE;
     }
 
     TwapiInitTclTypes();
@@ -798,7 +790,7 @@ static int TwapiOneTimeInit(void *pv)
         sizeof(gTwapiOSVersionInfo);
     if (!TwapiRtlGetVersion(&gTwapiOSVersionInfo)) {
         Tcl_SetResult(interp, "Could not get OS version.", TCL_STATIC);
-        return TCL_ERROR;
+        return FALSE;
     }
 
     TwapiWinPath temp;
@@ -807,16 +799,16 @@ static int TwapiOneTimeInit(void *pv)
         || (exe_path = TwapiWinGetFullPathName(exe_path, &gExePath, NULL))
                == NULL) {
         Tcl_SetResult(interp, "Failed to get application path.", TCL_STATIC);
-        return TCL_ERROR;
+        return FALSE;
     }
     gExePathLen = (DWORD) wcslen(exe_path);
     if (WSAStartup(ws_ver, &ws_data) != 0) {
         Tcl_SetResult(interp, "Could not initialize Winsock.", TCL_STATIC);
-        return TCL_ERROR;
+        return FALSE;
     }
 
     Tcl_CreateExitHandler(Twapi_Cleanup, NULL);
-    return TCL_OK;
+    return TRUE;
 }
 
 TwapiId Twapi_NewId(TwapiInterpContext *ticP)

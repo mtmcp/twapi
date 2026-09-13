@@ -140,7 +140,7 @@ typedef struct _NPipeEvent {
 } NPipeEvent;
 
 
-static TwapiOneTimeInitState gNPipeModuleInitialized;
+static INIT_ONCE gNPipeInitialized;
 
 /* Prototypes */
 static int NPipeEventProc(Tcl_Event *, int flags);
@@ -202,16 +202,17 @@ static int NPipeSetTclErrnoFromWin32Error(WIN32_ERROR winerr)
     return Tcl_GetErrno();
 }
 
-static int NPipeModuleInit(void *arg)
+static BOOL
+NPipeModuleInitOnce(PINIT_ONCE initOnceP, PVOID arg, PVOID *contextP)
 {
     Tcl_Interp *interp = arg;
+    (void)contextP;
     gNPipeTlsSlot = Twapi_AssignTlsSubSlot();
     if (gNPipeTlsSlot < 0) {
         ObjSetStaticResult(interp, "Could not assign private TLS slot");
-        return TCL_ERROR;
+        return FALSE;
     }
-
-    return TCL_OK;
+    return TRUE;
 }
 
 
@@ -1529,7 +1530,8 @@ int Twapi_namedpipe_Init(Tcl_Interp *interp)
     }
 
     /* Init unless already done. */
-    if (! TwapiDoOneTimeInit(&gNPipeModuleInitialized, NPipeModuleInit, interp))
+    if (!InitOnceExecuteOnce(
+            &gNPipeInitialized, NPipeModuleInitOnce, interp, NULL))
         return TCL_ERROR;
 
     return TwapiRegisterModule(interp, MODULE_HANDLE, &gModuleDef, DEFAULT_TIC) ? TCL_OK : TCL_ERROR;

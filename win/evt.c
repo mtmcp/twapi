@@ -29,7 +29,7 @@ HMODULE gModuleHandle;     /* DLL handle to ourselves */
 #endif
 
 static REGHANDLE gEvtRegHandle = 0;
-static TwapiOneTimeInitState gEvtInitialized;
+static INIT_ONCE gEvtInitialized;
 
 /* Used as a typedef for returning allocated memory to script level */
 #define TWAPI_EVT_RENDER_VALUES_TYPESTR "EVT_RENDER_VALUES *"
@@ -1286,8 +1286,12 @@ int TwapiEvtInitCalls(Tcl_Interp *interp, TwapiInterpContext *ticP)
     return TCL_OK;
 }
 
-static int EvtModuleOneTimeInit(void *arg)
+static BOOL
+EvtModuleInitOnce(PINIT_ONCE initOnceP, PVOID arg, PVOID *contextP)
 {
+    (void)arg;
+    (void)contextP;
+
     /* Ignore return value so failure does not prevent the whole module from loading. */
     (void) EventRegister(
         &TWAPI_EVT_PROVIDER,
@@ -1295,7 +1299,7 @@ static int EvtModuleOneTimeInit(void *arg)
         NULL,                 /* CallbackContext                    */
         &gEvtRegHandle);
 
-    return TCL_OK;
+    return TRUE;
 }
 
 /* Called when interp is deleted */
@@ -1335,10 +1339,12 @@ int Twapi_evt_Init(Tcl_Interp *interp)
     }
 
     /* Init unless already done. */
-    if (! TwapiDoOneTimeInit(&gEvtInitialized, EvtModuleOneTimeInit, interp))
+    if (!InitOnceExecuteOnce(&gEvtInitialized, EvtModuleInitOnce, interp, NULL))
         return TCL_ERROR;
 
     /* NEW_TIC since we have a cleanup routine */
-    return TwapiRegisterModule(interp, MODULE_HANDLE, &gModuleDef, NEW_TIC) ? TCL_OK : TCL_ERROR;
+    return TwapiRegisterModule(interp, MODULE_HANDLE, &gModuleDef, NEW_TIC)
+             ? TCL_OK
+             : TCL_ERROR;
 }
 

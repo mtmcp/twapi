@@ -243,58 +243,7 @@ void TwapiFreeRegisteredPointer(Tcl_Interp *interp, void *p, void *typetag)
     TwapiFree(p);
 }
 
-
-int TwapiDoOneTimeInit(TwapiOneTimeInitState *stateP, TwapiOneTimeInitFn *fn, ClientData clientdata)
-{
-    TwapiOneTimeInitState prev_state;
-
-    /* Init unless already done. */
-    switch (InterlockedCompareExchange(stateP,
-                                       TWAPI_INITSTATE_IN_PROGRESS,
-                                       TWAPI_INITSTATE_NOT_DONE)) {
-    case TWAPI_INITSTATE_DONE:
-        return 3;               /* Already done */
-
-    case TWAPI_INITSTATE_IN_PROGRESS:
-        while (1) {
-            prev_state = InterlockedCompareExchange(stateP,
-                                                    TWAPI_INITSTATE_IN_PROGRESS,
-                                                    TWAPI_INITSTATE_IN_PROGRESS);
-            if (prev_state == TWAPI_INITSTATE_DONE)
-                return 2;       /* Done after waiting */
-
-            if (prev_state != TWAPI_INITSTATE_IN_PROGRESS)
-                return 0; /* Error but do not know what - someone else was
-                             initializing */
-
-            /*
-             * Someone is initializing, wait in a spin
-             * Note the Sleep() will yield to other threads, including
-             * the one doing the init, so this is not a hard loop
-             */
-            Sleep(1);
-        }
-        break;
-
-    case TWAPI_INITSTATE_NOT_DONE:
-        /* We need to do the init */
-        if (fn(clientdata) != TCL_OK) {
-            InterlockedExchange(stateP, TWAPI_INITSTATE_ERROR);
-            return 0;
-        }
-        InterlockedExchange(stateP, TWAPI_INITSTATE_DONE);
-        return 1;               /* We init'ed successfully */
-
-    case TWAPI_INITSTATE_ERROR:
-        /* State was already in error. No way to recover safely 
-           See comments about not calling Tcl_SetResult to set error */
-        return 0;
-    }
-    
-    return 0;
-}
-
-/* 
+/*
  * Invokes a Tcl command from objv[] and updates the passed 
  * TwapiPendingCallback structure result. Note the following:
  *  - the objv[] array generally must not be accessed again by caller

@@ -197,15 +197,7 @@ ULONG  gETWProviderTraceEnableLevel;             /* Level set by ETW controller 
 /* Session our provider is attached to */
 TRACEHANDLE gETWProviderSessionHandle; /* Initialized in one-time init as system dependent */
 
-
-/*
- * Whether the callback dll/libray has been initialized.
- * The value must be managed using the InterlockedCompareExchange functions to
- * ensure thread safety. The value returned by InterlockedCompareExhange
- * 0 -> first to call, do init,  1 -> init in progress by some other thread
- * 2 -> Init done
- */
-static TwapiOneTimeInitState gETWInitialized;
+static INIT_ONCE gETWInitialized;
 
 #ifndef TWAPI_SINGLE_MODULE
 HMODULE gModuleHandle;     /* DLL handle to ourselves */
@@ -2699,8 +2691,12 @@ static int TwapiETWInitCalls(Tcl_Interp *interp, TwapiInterpContext *ticP)
     return TCL_OK;
 }
 
-static int ETWModuleOneTimeInit(void *arg)
+
+static BOOL
+ETWModuleInitOnce(PINIT_ONCE initOnceP, PVOID arg, PVOID *contextP)
 {
+    (void)arg;
+    (void)contextP;
     /* Depends on OS - see documentation of OpenTrace in SDK */
     if (sizeof(void*) == 8) {
         gInvalidTraceHandle = 0xFFFFFFFFFFFFFFFF;
@@ -2714,7 +2710,7 @@ static int ETWModuleOneTimeInit(void *arg)
     gETWProviderSessionHandle = gInvalidTraceHandle;
     InitializeCriticalSection(&gETWCS);
 
-    return TCL_OK;
+    return TRUE;
 }
 
 /* Called when interp is deleted */
@@ -2751,10 +2747,12 @@ int Twapi_etw_Init(Tcl_Interp *interp)
     }
 
     /* Init unless already done. */
-    if (! TwapiDoOneTimeInit(&gETWInitialized, ETWModuleOneTimeInit, interp))
+    if (!InitOnceExecuteOnce(&gETWInitialized, ETWModuleInitOnce, interp, NULL))
         return TCL_ERROR;
 
     /* NEW_TIC since we have a cleanup routine */
-    return TwapiRegisterModule(interp, MODULE_HANDLE, &gModuleDef, NEW_TIC) ? TCL_OK : TCL_ERROR;
+    return TwapiRegisterModule(interp, MODULE_HANDLE, &gModuleDef, NEW_TIC)
+             ? TCL_OK
+             : TCL_ERROR;
 }
 
