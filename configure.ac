@@ -128,7 +128,6 @@ if test "${TEA_PLATFORM}" = "windows" ; then
 	    win/pbkdf2.c
 	    win/device.c
 	    win/etw.c
-	    win/eventlog.c
 	    win/evt.c
 	    win/input.c
 	    win/mstask.c
@@ -189,9 +188,7 @@ if test "${TEA_PLATFORM}" = "windows" ; then
 	    library/tls.tcl
 	    library/device.tcl
 	    library/etw.tcl
-	    library/eventlog.tcl
 	    library/evt.tcl
-	    library/winlog.tcl
 	    library/input.tcl
 	    library/msi.tcl
 	    library/mstask.tcl
