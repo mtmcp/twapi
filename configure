@@ -5008,7 +5008,7 @@ fi
 
 
 
-    vars="-I. -I\"$(${CYGPATH} ${srcdir}/twapi/include)\" -I\"${srcdir}/dyncall/dyncall-0.9/include\""
+    vars="-I. -I\"$(${CYGPATH} ${srcdir}/win/rc)\""
     for i in $vars; do
 	PKG_INCLUDES="$PKG_INCLUDES $i"
     done

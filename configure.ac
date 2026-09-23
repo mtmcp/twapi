@@ -90,7 +90,7 @@ if test "${TEA_PLATFORM}" = "windows" ; then
                         AC_DEFINE(HAVE_SYSTEM_STATUS_FLAG)
                     ], [], [[#include <windows.h>]])
 
-    TEA_ADD_INCLUDES([-I. -I\"$(${CYGPATH} ${srcdir}/twapi/include)\" -I\"${srcdir}/dyncall/dyncall-0.9/include\"])
+    TEA_ADD_INCLUDES([-I. -I\"$(${CYGPATH} ${srcdir}/win/rc)\"])
 
     TEA_ADD_CFLAGS([-DUNICODE -D_UNICODE -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -DPSAPI_VERSION=2])
 
