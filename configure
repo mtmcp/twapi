@@ -630,7 +630,6 @@ MAKE_SHARED_LIB
 MAKE_LIB
 LDFLAGS_DEFAULT
 CFLAGS_DEFAULT
-DYNCALL_LIBS
 LD_LIBRARY_PATH_VAR
 SHLIB_CFLAGS
 SHLIB_LD_LIBS
@@ -8117,20 +8116,6 @@ $as_echo "no" >&6; }
     fi
 
 
-
-# Link to either the 64- or 32-bit dyncall libs. This check has to happen
-# after TEA_CONFIG_CFLAGS because that sets the do64bit variable
-if test "$do64bit" != "yes" -a "x$MSYSTEM" != "xMINGW64"; then :
-
-	  DYNCALL_LIBS="${srcdir}/dyncall/dyncall-0.9/lib/release_x86/libdyncall_s.lib"
-
-
-else
-
-	  DYNCALL_LIBS="${srcdir}/dyncall/dyncall-0.9/lib/release_amd64/libdyncall_s.lib"
-
-
-fi
 
 #--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols option.
